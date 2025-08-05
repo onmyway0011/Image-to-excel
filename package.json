@@ -4,9 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node run_tests.js",
+    "start": "node src/index.js",
+    "dev": "concurrently \"npm start\" \"cd client && npm start\"",
+    "test": "jest",
     "test:backend": "jest",
-    "test:frontend": "cd client && npm test"
+    "test:frontend": "cd client && npm test",
+    "test:automated": "node run_tests.js"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.28.0",
@@ -19,6 +22,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@playwright/test": "^1.54.2",
     "child_process": "^1.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",

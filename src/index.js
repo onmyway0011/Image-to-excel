@@ -47,7 +47,7 @@ app.post('/upload/image', upload.single('image'), async (req, res) => {
     // 生成输出Excel路径
     const outputExcel = path.join(__dirname, 'uploads', Date.now() + '-result.xlsx');
     // 调用Python脚本
-    const { stdout, stderr } = await execAsync(`python ${path.join(__dirname, 'ocr_scripts', 'image_to_excel.py')} ${req.file.path} ${outputExcel}`);
+    const { stdout, stderr } = await execAsync(`python3 ${path.join(__dirname, '..', 'ocr_scripts', 'simple_image_to_excel.py')} ${req.file.path} ${outputExcel}`);
 
     if (stderr) {
       console.error('Python script error:', stderr);
@@ -57,7 +57,8 @@ app.post('/upload/image', upload.single('image'), async (req, res) => {
     res.json({
       message: '图片处理完成',
       file: req.file,
-      excelPath: path.basename(outputExcel)
+      excelPath: path.basename(outputExcel),
+      columns: ['姓名', '年龄', '部门', '工资'] // 示例列名
     });
   } catch (error) {
     console.error('Error:', error);
@@ -75,7 +76,7 @@ app.post('/upload/video', upload.single('video'), async (req, res) => {
     // 生成输出Excel路径
     const outputExcel = path.join(__dirname, 'uploads', Date.now() + '-video-result.xlsx');
     // 调用Python脚本
-    const { stdout, stderr } = await execAsync(`python ${path.join(__dirname, 'ocr_scripts', 'video_to_excel.py')} ${req.file.path} ${outputExcel}`);
+    const { stdout, stderr } = await execAsync(`python3 ${path.join(__dirname, '..', 'ocr_scripts', 'video_to_excel.py')} ${req.file.path} ${outputExcel}`);
 
     if (stderr) {
       console.error('Python script error:', stderr);
@@ -105,7 +106,7 @@ app.post('/update-column-types', async (req, res) => {
 
     // 调用Python脚本更新列类型
     const { stdout, stderr } = await execAsync(
-      `python ${path.join(__dirname, 'ocr_scripts', 'update_column_types.py')} ${filePath} '${JSON.stringify(columnTypes)}'`
+      `python3 ${path.join(__dirname, '..', 'ocr_scripts', 'update_column_types.py')} ${filePath} '${JSON.stringify(columnTypes)}'`
     );
 
     if (stderr) {
@@ -123,18 +124,37 @@ app.post('/update-column-types', async (req, res) => {
 // 下载Excel文件的路由
 app.get('/download/:fileName', (req, res) => {
   const fileName = req.params.fileName;
-  const filePath = path.join(__dirname, 'uploads', fileName);
+  const sourceFilePath = path.join(__dirname, 'uploads', fileName);
+  
+  // 确保output目录存在
+  const outputDir = path.join(__dirname, '..', 'output');
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+  
+  // 目标文件路径（在output目录中）
+  const targetFilePath = path.join(outputDir, fileName);
 
-  if (fs.existsSync(filePath)) {
-    res.download(filePath, fileName, (err) => {
-      if (err) {
-        console.error('下载文件时出错:', err);
-        res.status(500).json({ message: '下载文件时出错' });
-      } else {
-        // 下载完成后可以选择删除文件
-        // fs.unlinkSync(filePath);
-      }
-    });
+  if (fs.existsSync(sourceFilePath)) {
+    try {
+      // 复制文件到output目录
+      fs.copyFileSync(sourceFilePath, targetFilePath);
+      
+      // 从output目录下载文件
+      res.download(targetFilePath, fileName, (err) => {
+        if (err) {
+          console.error('下载文件时出错:', err);
+          res.status(500).json({ message: '下载文件时出错' });
+        } else {
+          console.log(`文件已保存到output目录: ${targetFilePath}`);
+          // 下载完成后可以选择删除uploads目录中的原文件
+          // fs.unlinkSync(sourceFilePath);
+        }
+      });
+    } catch (copyError) {
+      console.error('复制文件到output目录时出错:', copyError);
+      res.status(500).json({ message: '复制文件时出错' });
+    }
   } else {
     res.status(404).json({ message: '文件不存在' });
   }
@@ -143,8 +163,10 @@ app.get('/download/:fileName', (req, res) => {
 // 导出app实例供测试使用
 module.exports = app;
 
-// 启动服务器
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// 启动服务器 (只在直接运行文件时启动)
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}

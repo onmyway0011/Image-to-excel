@@ -1,6 +1,9 @@
 import os
 import sys
+import os
 import cv2
+import json
+import requests
 import pandas as pd
 from paddleocr import PaddleOCR
 from openpyxl import Workbook
@@ -11,6 +14,11 @@ class ImageToExcelConverter:
     def __init__(self):
         # 初始化OCR模型
         self.ocr = PaddleOCR(use_angle_cls=True, lang='ch')
+        # 阿里云百炼大模型API配置
+        self.aliyun_api_id = '2444448'
+        self.aliyun_api_key = 'sk-b85dafcfb7174b83b96fcc01c76245e5'
+        self.aliyun_api_url = 'https://spark-api.xf-yun.com/v3.5/chat/completions'
+        self.model = 'qwen-plus'
 
     def process_image(self, image_path):
         # 读取图像
@@ -65,7 +73,56 @@ class ImageToExcelConverter:
         df = pd.DataFrame(rows)
         return df, "识别成功"
 
+    def check_columns_with_ai(self, df):
+        """使用阿里云百炼大模型检查列是否符合常识"""
+        # 提取列名（假设第一行是列名）
+        columns = df.iloc[0].tolist() if not df.empty else []
+        if not columns:
+            return True, "没有检测到列名"
+
+        # 构建提示词
+        prompt = f"以下是从图像识别提取的表格列名：{columns}。这些列名是否符合常识？如果不符合，请指出问题并提供修正建议。"
+
+        # 调用阿里云百炼大模型API
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {self.aliyun_api_key}'
+        }
+
+        payload = {
+            'model': self.model,
+            'messages': [
+                {'role': 'system', 'content': '你是一个数据分析师，负责检查表格列名是否符合常识。'}, 
+                {'role': 'user', 'content': prompt}
+            ]
+        }
+
+        try:
+            response = requests.post(
+                self.aliyun_api_url,
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+            response.raise_for_status()
+            result = response.json()
+            content = result['choices'][0]['message']['content']
+
+            # 分析结果
+            if '不符合' in content or '问题' in content:
+                return False, content
+            else:
+                return True, content
+        except Exception as e:
+            return False, f"API调用错误: {str(e)}"
+
     def save_to_excel(self, df, output_path):
+        # 确保输出路径在output目录下
+        output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'output')
+        os.makedirs(output_dir, exist_ok=True)
+        filename = os.path.basename(output_path)
+        output_path = os.path.join(output_dir, filename)
+
         # 创建一个工作簿
         wb = Workbook()
         ws = wb.active
@@ -103,17 +160,25 @@ class ImageToExcelConverter:
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print("用法: python image_to_excel.py <图像路径> <输出Excel路径>")
+        print("用法: python image_to_excel.py <图像路径> <输出Excel文件名>")
         sys.exit(1)
 
     image_path = sys.argv[1]
-    output_path = sys.argv[2]
+    output_filename = sys.argv[2]
 
     converter = ImageToExcelConverter()
     df, message = converter.process_image(image_path)
 
     if df is not None:
-        excel_path = converter.save_to_excel(df, output_path)
-        print(f"成功生成Excel文件: {excel_path}")
+        # 使用AI检查列是否符合常识
+        is_valid, ai_message = converter.check_columns_with_ai(df)
+        print(f"AI检查结果: {ai_message}")
+
+        if is_valid:
+            # 保存到Excel
+            excel_path = converter.save_to_excel(df, output_filename)
+            print(f"成功生成Excel文件: {excel_path}")
+        else:
+            print(f"列检查未通过，无法生成Excel文件。")
     else:
         print(f"错误: {message}")

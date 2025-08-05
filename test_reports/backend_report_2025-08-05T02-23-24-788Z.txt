@@ -1,0 +1,10 @@
+{
+  "success": false,
+  "output": "The \"options.cwd\" property must be of type string or an instance of Buffer or URL. Received type boolean (true)",
+  "details": {
+    "totalTests": 0,
+    "failedTests": 0,
+    "passedTests": 0,
+    "coverage": 0
+  }
+}

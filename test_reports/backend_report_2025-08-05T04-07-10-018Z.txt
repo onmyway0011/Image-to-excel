@@ -1,0 +1,10 @@
+{
+  "success": false,
+  "output": "Command failed: npm test -- --coverage\n",
+  "details": {
+    "totalTests": 0,
+    "failedTests": 0,
+    "passedTests": 0,
+    "coverage": 0
+  }
+}

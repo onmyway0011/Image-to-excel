@@ -1,7 +1,7 @@
-const supertest = require('supertest');
+const request = require('supertest');
 const fs = require('fs');
 const path = require('path');
-const request = require('supertest');
+const supertest = require('supertest');
 
 // 直接模拟child_process模块
 jest.mock('child_process', () => ({
@@ -17,7 +17,7 @@ jest.mock('child_process', () => ({
 // 重置模块缓存，确保我们的mock生效
 jest.resetModules();
 // 重新导入app
-const app = require('../server');
+const app = require('../src/index');
 
 // 保存服务器引用
 let server;
@@ -69,7 +69,7 @@ describe('Server API', () => {
   });
 
   test('GET / should return running message', async () => {
-    const res = await supertest(app).get('/');
+    const res = await request(app).get('/');
     expect(res.statusCode).toBe(200);
     expect(res.text).toBe('Image to Excel API is running');
   });
@@ -81,7 +81,7 @@ describe('Server API', () => {
 
     // 已经在模块级别模拟了exec函数，不需要在这里设置返回值
 
-    const res = await supertest(app)
+    const res = await request(app)
       .post('/upload/image')
       .attach('image', tempImagePath);
 
@@ -102,7 +102,7 @@ describe('Server API', () => {
 
     // 已经在模块级别模拟了exec函数，不需要在这里设置返回值
 
-    const res = await supertest(app)
+    const res = await request(app)
       .post('/upload/video')
       .attach('video', tempVideoPath);
 
@@ -123,7 +123,7 @@ describe('Server API', () => {
 
     // 已经在模块级别模拟了exec函数，不需要在这里设置返回值
 
-    const res = await supertest(app)
+    const res = await request(app)
       .post('/update-column-types')
       .send({
         fileName: 'test.xlsx',
@@ -143,7 +143,7 @@ describe('Server API', () => {
     const testFilePath = path.join(__dirname, '../uploads', 'test-download.xlsx');
     fs.writeFileSync(testFilePath, 'dummy download data');
 
-    const res = await supertest(app).get('/download/test-download.xlsx');
+    const res = await request(app).get('/download/test-download.xlsx');
 
     // 清理测试文件
     fs.unlinkSync(testFilePath);
